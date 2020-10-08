@@ -209,7 +209,7 @@ runtime::TrtEngineAndContext TensorRTBuilder::BuildEngine(
            num_input_bindings + network_output_names_.size());
   nvinfer1::IExecutionContext* context = engine->createExecutionContext();
   return {engine, context, network_input_names_, network_input_is_baked_,
-          network_output_names_};
+          network_output_names_, std::vector<void*> (engine->getNbBindings(), nullptr)};
 }
 
 nvinfer1::Weights TensorRTBuilder::GetDLTensorAsWeights(
