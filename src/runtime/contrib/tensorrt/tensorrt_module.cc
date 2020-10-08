@@ -20,6 +20,9 @@
  * \file runtime/contrib/tensorrt/tensorrt_module.cc
  * \brief TensorRTModule is the runtime module for tensorrt backend.
  */
+#include "../../file_util.h"
+#include "tensorrt_module.h"
+#include <cuda_runtime_api.h>
 
 #include <stdlib.h>
 #include <tvm/node/serialization.h>
@@ -31,9 +34,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include "../../file_util.h"
-#include "tensorrt_module.h"
-#include <cuda_runtime_api.h>
+
 #ifdef TVM_GRAPH_RUNTIME_TENSORRT
 #include "NvInfer.h"
 #include "tensorrt_builder.h"
@@ -90,9 +91,9 @@ class TensorRTModule : public runtime::ModuleNode {
         CacheEngineToDisk(key, engine_and_context);
         LOG(INFO) << "Finished building TensorRT engine for subgraph " << name;
         this->trt_engine_cache_[name] = engine_and_context;
-        this->ExecuteEngine(this->trt_engine_cache_[name], args, rv);
+        this->ExecuteEngine(&this->trt_engine_cache_[name], args, rv);
       } else {
-        this->ExecuteEngine(it->second, args, rv);
+        this->ExecuteEngine(&it->second, args, rv);
       }
     });
 #else
@@ -178,24 +179,24 @@ class TensorRTModule : public runtime::ModuleNode {
    * \param rv Return value pointer for the PackedFunc.
    * \return Inputs converted to vector of DLTensor*
    */
-  void ExecuteEngine(TrtEngineAndContext& engine_and_context,
+  void ExecuteEngine(TrtEngineAndContext* engine_and_context,
                      tvm::TVMArgs args, tvm::TVMRetValue* rv) {
-    auto engine = engine_and_context.engine;
-    auto context = engine_and_context.context;
-    auto& device_pointers = engine_and_context.device_mem_pointers;
+    auto engine = engine_and_context->engine;
+    auto context = engine_and_context->context;
+    auto& device_pointers = engine_and_context->device_mem_pointers;
     const int num_bindings = engine->getNbBindings();
     std::vector<void*> bindings(num_bindings, nullptr);
     DLContext gpu_ctx = {kDLGPU, 0};
     // Set inputs.
     auto inputs = ConvertInputs(args);
-    const size_t num_outputs = engine_and_context.outputs.size();
+    const size_t num_outputs = engine_and_context->outputs.size();
     CHECK_GT(inputs.size(), num_outputs);
-    for (size_t i = 0; i < engine_and_context.inputs.size(); ++i) {
+    for (size_t i = 0; i < engine_and_context->inputs.size(); ++i) {
       // If an input was baked into the engine, skip.
-      if (engine_and_context.input_is_baked[i]) continue;
+      if (engine_and_context->input_is_baked[i]) continue;
       DLTensor* arg = inputs[i];
       int binding_index =
-          engine->getBindingIndex(engine_and_context.inputs[i].c_str());
+          engine->getBindingIndex(engine_and_context->inputs[i].c_str());
       CHECK_NE(binding_index, -1);
       if (!runtime::TypeMatch(arg->dtype, kDLFloat, 32)) {
         LOG(FATAL) << "Only float32 inputs are supported.";
@@ -207,7 +208,8 @@ class TensorRTModule : public runtime::ModuleNode {
                                   inputs[i]->dtype, &gpu_mem);
           device_pointers[binding_index] = gpu_mem;
         }
-        TVMDeviceCopyDataFromTo(inputs[i]->data, 0, device_pointers[binding_index], 0, tvm::runtime::GetDataSize(*inputs[i]),
+        TVMDeviceCopyDataFromTo(inputs[i]->data, 0, device_pointers[binding_index], 0,
+                                tvm::runtime::GetDataSize(*inputs[i]),
                                 inputs[i]->ctx, gpu_ctx, inputs[i]->dtype, nullptr);
         bindings[binding_index] = reinterpret_cast<float*>(device_pointers[binding_index]);
       } else {
@@ -231,13 +233,13 @@ class TensorRTModule : public runtime::ModuleNode {
       const int index_in_inputs = inputs.size() - num_outputs + i;
       DLTensor* out_arg = inputs[index_in_inputs];
       int binding_index =
-          engine->getBindingIndex(engine_and_context.outputs[i].c_str());
+          engine->getBindingIndex(engine_and_context->outputs[i].c_str());
       CHECK_NE(binding_index, -1);
       if (out_arg->ctx.device_type == kDLCPU) {
         if (device_pointers[binding_index] == nullptr) {
           void* gpu_mem;
-          TVMDeviceAllocDataSpace(gpu_ctx, tvm::runtime::GetDataSize(*out_arg), 256, out_arg->dtype,
-                                  &gpu_mem);
+          TVMDeviceAllocDataSpace(gpu_ctx, tvm::runtime::GetDataSize(*out_arg), 256,
+                                  out_arg->dtype, &gpu_mem);
           device_pointers[binding_index] = gpu_mem;
         }
         bindings[binding_index] = reinterpret_cast<float*>(device_pointers[binding_index]);
@@ -256,10 +258,11 @@ class TensorRTModule : public runtime::ModuleNode {
     for (size_t i = 0; i < num_outputs; ++i) {
       const int index_in_inputs = inputs.size() - num_outputs + i;
       DLTensor* out_arg = inputs[index_in_inputs];
-      int binding_index = engine->getBindingIndex(engine_and_context.outputs[i].c_str());
+      int binding_index = engine->getBindingIndex(engine_and_context->outputs[i].c_str());
       CHECK_NE(binding_index, -1);
       if (out_arg->ctx.device_type == kDLCPU) {
-        TVMDeviceCopyDataFromTo(device_pointers[binding_index], 0, out_arg->data, 0, tvm::runtime::GetDataSize(*out_arg),
+        TVMDeviceCopyDataFromTo(device_pointers[binding_index], 0, out_arg->data, 0,
+                                tvm::runtime::GetDataSize(*out_arg),
                                 gpu_ctx, out_arg->ctx, out_arg->dtype, nullptr);
       }
     }
