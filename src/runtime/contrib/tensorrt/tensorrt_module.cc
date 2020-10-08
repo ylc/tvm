@@ -20,20 +20,19 @@
  * \file runtime/contrib/tensorrt/tensorrt_module.cc
  * \brief TensorRTModule is the runtime module for tensorrt backend.
  */
-#include "../../file_util.h"
+
 #include "tensorrt_module.h"
 #include <cuda_runtime_api.h>
-
 #include <stdlib.h>
 #include <tvm/node/serialization.h>
 #include <tvm/relay/expr_functor.h>
 #include <tvm/relay/type.h>
 #include <tvm/runtime/ndarray.h>
-
 #include <fstream>
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include "../../file_util.h"
 
 #ifdef TVM_GRAPH_RUNTIME_TENSORRT
 #include "NvInfer.h"
@@ -61,6 +60,9 @@ class TensorRTModule : public runtime::ModuleNode {
     for (auto& it : trt_engine_cache_) {
       it.second.context->destroy();
       it.second.engine->destroy();
+      for (void* ptr : it.second.device_mem_pointers) {
+        TVMDeviceFreeDataSpace({kDLGPU, 0}, ptr);
+      }
     }
 #endif  // TVM_GRAPH_RUNTIME_TENSORRT
   }
@@ -201,19 +203,17 @@ class TensorRTModule : public runtime::ModuleNode {
       if (!runtime::TypeMatch(arg->dtype, kDLFloat, 32)) {
         LOG(FATAL) << "Only float32 inputs are supported.";
       }
-      if (inputs[i]->ctx.device_type == kDLCPU) {
+      if (inputs[i]->ctx.device_type == kDLGPU) {
+        bindings[binding_index] = reinterpret_cast<float*>(arg->data);
+      } else {
         if (device_pointers[binding_index] == nullptr) {
-          void* gpu_mem;
           TVMDeviceAllocDataSpace(gpu_ctx, tvm::runtime::GetDataSize(*inputs[i]), 256,
-                                  inputs[i]->dtype, &gpu_mem);
-          device_pointers[binding_index] = gpu_mem;
+                                  inputs[i]->dtype, &device_pointers[binding_index]);
         }
         TVMDeviceCopyDataFromTo(inputs[i]->data, 0, device_pointers[binding_index], 0,
                                 tvm::runtime::GetDataSize(*inputs[i]),
                                 inputs[i]->ctx, gpu_ctx, inputs[i]->dtype, nullptr);
         bindings[binding_index] = reinterpret_cast<float*>(device_pointers[binding_index]);
-      } else {
-        bindings[binding_index] = reinterpret_cast<float*>(arg->data);
       }
 #if TRT_VERSION_GE(6, 0, 1)
       // Set binding dimensions for INetworkV2 explicit batch mode engines.
@@ -235,16 +235,14 @@ class TensorRTModule : public runtime::ModuleNode {
       int binding_index =
           engine->getBindingIndex(engine_and_context->outputs[i].c_str());
       CHECK_NE(binding_index, -1);
-      if (out_arg->ctx.device_type == kDLCPU) {
+      if (out_arg->ctx.device_type == kDLGPU) {
+        bindings[binding_index] = reinterpret_cast<float*>(out_arg->data);
+      } else {
         if (device_pointers[binding_index] == nullptr) {
-          void* gpu_mem;
           TVMDeviceAllocDataSpace(gpu_ctx, tvm::runtime::GetDataSize(*out_arg), 256,
-                                  out_arg->dtype, &gpu_mem);
-          device_pointers[binding_index] = gpu_mem;
+                                  out_arg->dtype, &device_pointers[binding_index]);
         }
         bindings[binding_index] = reinterpret_cast<float*>(device_pointers[binding_index]);
-      } else {
-        bindings[binding_index] = reinterpret_cast<float*>(out_arg->data);
       }
     }
 #if TRT_VERSION_GE(6, 0, 1)
