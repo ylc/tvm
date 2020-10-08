@@ -64,8 +64,7 @@ class TensorRTModule : public runtime::ModuleNode {
       it.second.context->destroy();
       it.second.engine->destroy();
       for (void* ptr : it.second.device_mem_pointers) {
-        if (ptr)
-          TVMDeviceFreeDataSpace({kDLGPU, 0}, ptr);
+        if (ptr) TVMDeviceFreeDataSpace({kDLGPU, 0}, ptr);
       }
     }
 #endif  // TVM_GRAPH_RUNTIME_TENSORRT
