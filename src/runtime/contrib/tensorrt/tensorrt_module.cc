@@ -22,16 +22,19 @@
  */
 
 #include "tensorrt_module.h"
+
 #include <cuda_runtime_api.h>
 #include <stdlib.h>
 #include <tvm/node/serialization.h>
 #include <tvm/relay/expr_functor.h>
 #include <tvm/relay/type.h>
 #include <tvm/runtime/ndarray.h>
+
 #include <fstream>
 #include <string>
 #include <unordered_map>
 #include <vector>
+
 #include "../../file_util.h"
 
 #ifdef TVM_GRAPH_RUNTIME_TENSORRT
@@ -61,7 +64,8 @@ class TensorRTModule : public runtime::ModuleNode {
       it.second.context->destroy();
       it.second.engine->destroy();
       for (void* ptr : it.second.device_mem_pointers) {
-        TVMDeviceFreeDataSpace({kDLGPU, 0}, ptr);
+        if (ptr)
+          TVMDeviceFreeDataSpace({kDLGPU, 0}, ptr);
       }
     }
 #endif  // TVM_GRAPH_RUNTIME_TENSORRT
@@ -239,8 +243,8 @@ class TensorRTModule : public runtime::ModuleNode {
         bindings[binding_index] = reinterpret_cast<float*>(out_arg->data);
       } else {
         if (device_pointers[binding_index] == nullptr) {
-          TVMDeviceAllocDataSpace(gpu_ctx, tvm::runtime::GetDataSize(*out_arg), 256,
-                                  out_arg->dtype, &device_pointers[binding_index]);
+          TVMDeviceAllocDataSpace(gpu_ctx, tvm::runtime::GetDataSize(*out_arg), 256, out_arg->dtype,
+                                  &device_pointers[binding_index]);
         }
         bindings[binding_index] = reinterpret_cast<float*>(device_pointers[binding_index]);
       }
@@ -258,7 +262,7 @@ class TensorRTModule : public runtime::ModuleNode {
       DLTensor* out_arg = inputs[index_in_inputs];
       int binding_index = engine->getBindingIndex(engine_and_context->outputs[i].c_str());
       CHECK_NE(binding_index, -1);
-      if (out_arg->ctx.device_type == kDLCPU) {
+      if (out_arg->ctx.device_type != kDLGPU) {
         TVMDeviceCopyDataFromTo(device_pointers[binding_index], 0, out_arg->data, 0,
                                 tvm::runtime::GetDataSize(*out_arg),
                                 gpu_ctx, out_arg->ctx, out_arg->dtype, nullptr);
