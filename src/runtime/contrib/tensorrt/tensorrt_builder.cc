@@ -222,7 +222,7 @@ runtime::TrtEngineAndContext TensorRTBuilder::BuildEngine(
     }
   }
   return {
-      engine, context, network_input_names_, network_input_is_baked_, network_output_names_,
+      engine,        context, network_input_names_, network_input_is_baked_, network_output_names_,
       device_buffers};
 }
 
