@@ -63,9 +63,6 @@ class TensorRTModule : public runtime::ModuleNode {
     for (auto& it : trt_engine_cache_) {
       it.second.context->destroy();
       it.second.engine->destroy();
-      for (void* ptr : it.second.device_mem_pointers) {
-        if (ptr) TVMDeviceFreeDataSpace({kDLGPU, 0}, ptr);
-      }
     }
 #endif  // TVM_GRAPH_RUNTIME_TENSORRT
   }
@@ -188,7 +185,7 @@ class TensorRTModule : public runtime::ModuleNode {
                      tvm::TVMArgs args, tvm::TVMRetValue* rv) {
     auto engine = engine_and_context->engine;
     auto context = engine_and_context->context;
-    auto& device_pointers = engine_and_context->device_mem_pointers;
+    auto& device_buffers = engine_and_context->device_mem_buffers;
     const int num_bindings = engine->getNbBindings();
     std::vector<void*> bindings(num_bindings, nullptr);
     DLContext gpu_ctx = {kDLGPU, 0};
@@ -209,14 +206,8 @@ class TensorRTModule : public runtime::ModuleNode {
       if (inputs[i]->ctx.device_type == kDLGPU) {
         bindings[binding_index] = reinterpret_cast<float*>(arg->data);
       } else {
-        if (device_pointers[binding_index] == nullptr) {
-          TVMDeviceAllocDataSpace(gpu_ctx, tvm::runtime::GetDataSize(*inputs[i]), 256,
-                                  inputs[i]->dtype, &device_pointers[binding_index]);
-        }
-        TVMDeviceCopyDataFromTo(inputs[i]->data, 0, device_pointers[binding_index], 0,
-                                tvm::runtime::GetDataSize(*inputs[i]),
-                                inputs[i]->ctx, gpu_ctx, inputs[i]->dtype, nullptr);
-        bindings[binding_index] = reinterpret_cast<float*>(device_pointers[binding_index]);
+        device_buffers[binding_index].CopyFrom(inputs[i]);
+        bindings[binding_index] = reinterpret_cast<float*>(device_buffers[binding_index]->data);
       }
 #if TRT_VERSION_GE(6, 0, 1)
       // Set binding dimensions for INetworkV2 explicit batch mode engines.
@@ -241,11 +232,7 @@ class TensorRTModule : public runtime::ModuleNode {
       if (out_arg->ctx.device_type == kDLGPU) {
         bindings[binding_index] = reinterpret_cast<float*>(out_arg->data);
       } else {
-        if (device_pointers[binding_index] == nullptr) {
-          TVMDeviceAllocDataSpace(gpu_ctx, tvm::runtime::GetDataSize(*out_arg), 256, out_arg->dtype,
-                                  &device_pointers[binding_index]);
-        }
-        bindings[binding_index] = reinterpret_cast<float*>(device_pointers[binding_index]);
+        bindings[binding_index] = reinterpret_cast<float*>(device_buffers[binding_index]->data);
       }
     }
 #if TRT_VERSION_GE(6, 0, 1)
@@ -262,9 +249,7 @@ class TensorRTModule : public runtime::ModuleNode {
       int binding_index = engine->getBindingIndex(engine_and_context->outputs[i].c_str());
       CHECK_NE(binding_index, -1);
       if (out_arg->ctx.device_type != kDLGPU) {
-        TVMDeviceCopyDataFromTo(device_pointers[binding_index], 0, out_arg->data, 0,
-                                tvm::runtime::GetDataSize(*out_arg),
-                                gpu_ctx, out_arg->ctx, out_arg->dtype, nullptr);
+        device_buffers[binding_index].CopyTo(out_arg);
       }
     }
 #else

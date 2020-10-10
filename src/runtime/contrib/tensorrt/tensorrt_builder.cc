@@ -208,8 +208,21 @@ runtime::TrtEngineAndContext TensorRTBuilder::BuildEngine(
   CHECK_EQ(engine->getNbBindings(),
            num_input_bindings + network_output_names_.size());
   nvinfer1::IExecutionContext* context = engine->createExecutionContext();
+  std::vector<runtime::NDArray> device_buffers;
+  for (int i = 0; i < execution_args_.size(); i++) {
+    if (execution_args_[i]->ctx.device_type == kDLGPU) {
+      device_buffers.push_back(runtime::NDArray());
+    } else {
+      std::vector<int64_t> shape_;
+      for (int j = 0; j < execution_args_[i]->ndim; j++) {
+        shape_.push_back(execution_args_[i]->shape[j]);
+      }
+      device_buffers.push_back(runtime::NDArray::Empty(shape_, execution_args_[i]->dtype,
+                                                       {kDLGPU, 0}));
+    }
+  }
   return {engine, context, network_input_names_, network_input_is_baked_,
-          network_output_names_, std::vector<void*> (engine->getNbBindings(), nullptr)};
+          network_output_names_, device_buffers};
 }
 
 nvinfer1::Weights TensorRTBuilder::GetDLTensorAsWeights(
