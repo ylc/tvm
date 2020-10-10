@@ -217,12 +217,13 @@ runtime::TrtEngineAndContext TensorRTBuilder::BuildEngine(
       for (int j = 0; j < execution_args_[i]->ndim; j++) {
         shape_.push_back(execution_args_[i]->shape[j]);
       }
-      device_buffers.push_back(runtime::NDArray::Empty(shape_, execution_args_[i]->dtype,
-                                                       {kDLGPU, 0}));
+      device_buffers.push_back(
+          runtime::NDArray::Empty(shape_, execution_args_[i]->dtype, {kDLGPU, 0}));
     }
   }
-  return {engine, context, network_input_names_, network_input_is_baked_,
-          network_output_names_, device_buffers};
+  return {
+      engine, context, network_input_names_, network_input_is_baked_, network_output_names_,
+      device_buffers};
 }
 
 nvinfer1::Weights TensorRTBuilder::GetDLTensorAsWeights(
