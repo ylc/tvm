@@ -188,7 +188,6 @@ class TensorRTModule : public runtime::ModuleNode {
     auto& device_buffers = engine_and_context->device_mem_buffers;
     const int num_bindings = engine->getNbBindings();
     std::vector<void*> bindings(num_bindings, nullptr);
-    DLContext gpu_ctx = {kDLGPU, 0};
     // Set inputs.
     auto inputs = ConvertInputs(args);
     const size_t num_outputs = engine_and_context->outputs.size();
