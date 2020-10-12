@@ -211,27 +211,25 @@ runtime::TrtEngineAndContext TensorRTBuilder::BuildEngine(
   std::vector<runtime::NDArray> device_buffers;
   for (int i = 0; i < network_input_names_.size(); i++) {
     if (network_input_is_baked_[i]) continue;
-    int binding_index = engine->getBindingIndex(network_input_names_[i].c_str());
-    if (execution_args_[binding_index]->ctx.device_type == kDLGPU) {
+    if (execution_args_[i]->ctx.device_type == kDLGPU) {
       device_buffers.emplace_back();
     } else {
-      std::vector<int64_t> shape_(
-          execution_args_[binding_index]->shape,
-          execution_args_[binding_index]->shape + execution_args_[binding_index]->ndim);
+      std::vector<int64_t> shape_(execution_args_[i]->shape,
+                                  execution_args_[i]->shape + execution_args_[i]->ndim);
       device_buffers.push_back(
-          runtime::NDArray::Empty(shape_, execution_args_[binding_index]->dtype, {kDLGPU, 0}));
+          runtime::NDArray::Empty(shape_, execution_args_[i]->dtype, {kDLGPU, 0}));
     }
   }
   for (int i = 0; i < network_output_names_.size(); i++) {
-    int binding_index = engine->getBindingIndex(network_output_names_[i].c_str());
-    if (execution_args_[binding_index]->ctx.device_type == kDLGPU) {
+    int index_in_args = execution_args_.size() - network_output_names_.size() + i;
+    if (execution_args_[index_in_args]->ctx.device_type == kDLGPU) {
       device_buffers.emplace_back();
     } else {
       std::vector<int64_t> shape_(
-          execution_args_[binding_index]->shape,
-          execution_args_[binding_index]->shape + execution_args_[binding_index]->ndim);
+          execution_args_[index_in_args]->shape,
+          execution_args_[index_in_args]->shape + execution_args_[index_in_args]->ndim);
       device_buffers.push_back(
-          runtime::NDArray::Empty(shape_, execution_args_[binding_index]->dtype, {kDLGPU, 0}));
+          runtime::NDArray::Empty(shape_, execution_args_[index_in_args]->dtype, {kDLGPU, 0}));
     }
   }
   return {
