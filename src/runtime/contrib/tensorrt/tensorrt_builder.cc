@@ -214,10 +214,10 @@ runtime::TrtEngineAndContext TensorRTBuilder::BuildEngine(
     if (execution_args_[i]->ctx.device_type == kDLGPU) {
       device_buffers.emplace_back();
     } else {
-      std::vector<int64_t> shape_(execution_args_[i]->shape,
-                                  execution_args_[i]->shape + execution_args_[i]->ndim);
+      std::vector<int64_t> shape(execution_args_[i]->shape,
+                                 execution_args_[i]->shape + execution_args_[i]->ndim);
       device_buffers.push_back(
-          runtime::NDArray::Empty(shape_, execution_args_[i]->dtype, {kDLGPU, 0}));
+          runtime::NDArray::Empty(shape, execution_args_[i]->dtype, {kDLGPU, 0}));
     }
   }
   for (int i = 0; i < network_output_names_.size(); i++) {
@@ -225,11 +225,11 @@ runtime::TrtEngineAndContext TensorRTBuilder::BuildEngine(
     if (execution_args_[index_in_args]->ctx.device_type == kDLGPU) {
       device_buffers.emplace_back();
     } else {
-      std::vector<int64_t> shape_(
+      std::vector<int64_t> shape(
           execution_args_[index_in_args]->shape,
           execution_args_[index_in_args]->shape + execution_args_[index_in_args]->ndim);
       device_buffers.push_back(
-          runtime::NDArray::Empty(shape_, execution_args_[index_in_args]->dtype, {kDLGPU, 0}));
+          runtime::NDArray::Empty(shape, execution_args_[index_in_args]->dtype, {kDLGPU, 0}));
     }
   }
   return {
