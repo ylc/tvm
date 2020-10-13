@@ -73,16 +73,19 @@ def test_tensorrt_simple_cpu_io():
     out = relay.nn.relu(w)
     f = relay.Function([x, y, z], out)
 
-    mod = tvm.IRModule()
-    mod['main'] = f
-    mod = relay.tensorrt.EnableTrt(mod)
-    with relay.build_config(opt_level=3):
-        graph, lib, params = relay.build(mod, "llvm")
-    mod = graph_runtime.create(graph, lib, ctx=tvm.cpu())
     x_data = np.random.uniform(-1, 1, xshape).astype(dtype)
     y_data = np.random.uniform(-1, 1, yshape).astype(dtype)
     z_data = np.random.uniform(-1, 1, zshape).astype(dtype)
-    mod.run(x=x_data, y=y_data, z=z_data)
+
+    mod = tvm.IRModule()
+    mod['main'] = f
+    mod = relay.tensorrt.EnableTrt(mod)
+    params = {'y': y_data}
+    with relay.build_config(opt_level=3):
+        graph, lib, params = relay.build(mod, target="llvm", params=params)
+    mod = graph_runtime.create(graph, lib, ctx=tvm.cpu())
+    mod.set_input(**params)
+    mod.run(x=x_data, z=z_data)
     results = [mod.get_output(i).asnumpy() for i in range(mod.get_num_outputs())]
 
 def test_tensorrt_not_compatible():
