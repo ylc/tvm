@@ -181,8 +181,8 @@ class TensorRTModule : public runtime::ModuleNode {
    * \param rv Return value pointer for the PackedFunc.
    * \return Inputs converted to vector of DLTensor*
    */
-  void ExecuteEngine(TrtEngineAndContext* engine_and_context,
-                     tvm::TVMArgs args, tvm::TVMRetValue* rv) {
+  void ExecuteEngine(TrtEngineAndContext* engine_and_context, tvm::TVMArgs args,
+                     tvm::TVMRetValue* rv) {
     auto engine = engine_and_context->engine;
     auto context = engine_and_context->context;
     auto& device_buffers = engine_and_context->device_mem_buffers;
@@ -196,8 +196,7 @@ class TensorRTModule : public runtime::ModuleNode {
       // If an input was baked into the engine, skip.
       if (engine_and_context->input_is_baked[i]) continue;
       DLTensor* arg = inputs[i];
-      int binding_index =
-          engine->getBindingIndex(engine_and_context->inputs[i].c_str());
+      int binding_index = engine->getBindingIndex(engine_and_context->inputs[i].c_str());
       CHECK_NE(binding_index, -1);
       if (!runtime::TypeMatch(arg->dtype, kDLFloat, 32)) {
         LOG(FATAL) << "Only float32 inputs are supported.";
@@ -225,8 +224,7 @@ class TensorRTModule : public runtime::ModuleNode {
     for (size_t i = 0; i < num_outputs; ++i) {
       const int index_in_inputs = inputs.size() - num_outputs + i;
       DLTensor* out_arg = inputs[index_in_inputs];
-      int binding_index =
-          engine->getBindingIndex(engine_and_context->outputs[i].c_str());
+      int binding_index = engine->getBindingIndex(engine_and_context->outputs[i].c_str());
       CHECK_NE(binding_index, -1);
       if (out_arg->ctx.device_type == kDLGPU) {
         bindings[binding_index] = reinterpret_cast<float*>(out_arg->data);
