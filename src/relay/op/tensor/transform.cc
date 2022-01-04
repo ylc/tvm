@@ -1729,9 +1729,9 @@ bool STFTRel(const Array<Type>& types, int num_inputs, const Attrs& attrs,
   // std::cout << "Data Shape 0" << data->shape[0];
   // reporter->Assign(types[types.size() - 1], TensorType(Array<PrimExpr>{batch_size, 1025, 87, Any()}, tvm::DataType::Float(32)));
 
-  // reporter->Assign(types[types.size() - 1], TensorType(Array<PrimExpr>{batch_size, Any(), Any(), 2}, tvm::DataType::Float(32)));
+  reporter->Assign(types[types.size() - 1], TensorType(Array<PrimExpr>{batch_size, Any(), Any(), 2}, tvm::DataType::Float(32)));
 
-  reporter->Assign(types[types.size() - 1], TensorType(Array<PrimExpr>{batch_size, 1025,87, 2}, tvm::DataType::Float(32)));
+  // reporter->Assign(types[types.size() - 1], TensorType(Array<PrimExpr>{batch_size, 1025,87, 2}, tvm::DataType::Float(32)));
 
   return true;
 }
