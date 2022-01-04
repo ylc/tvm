@@ -1805,3 +1805,11 @@ def invert_permutation(data):
         relay.invert_permutation(data) = [2, 4, 3, 0, 1]
     """
     return _make.invert_permutation(data)
+
+
+def stft(data, n_fft, hop_length, win_length, window):
+    n_fft = const([n_fft], dtype="int64")
+    hop_length = const([hop_length], dtype="int64")
+    win_length = const([win_length], dtype="int64")
+    # import pdb;pdb.set_trace()
+    return _make.stft(data, n_fft, hop_length, win_length, window)

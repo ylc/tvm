@@ -222,11 +222,35 @@ def broadcast_shape_func(attrs, inputs, out_ndims):
     return [_broadcast_shape_func(*inputs, out_ndims[0])]
 
 
+
+import tvm
+from tvm import te
+from tvm.topi import tag
+
+@tvm.te.tag_scope(tag=tag.ELEMWISE)
+def identity(x):
+    """Take identity of input x.
+
+    Parameters
+    ----------
+    x : tvm.te.Tensor
+        Input argument.
+
+    Returns
+    -------
+    y : tvm.te.Tensor
+        The result.
+    """
+    # pylint: disable=unnecessary-lambda
+    return te.compute(x.shape, lambda *i: x(*i))
+
 def elemwise_shape_func(attrs, inputs, _):
     """
     Shape function for elemwise op.
     """
-    return [topi.math.identity(inputs[0])]
+    # import pdb;pdb.set_trace()
+    # return [topi.math.identity(inputs[0])]
+    return [identity(inputs[0])]
 
 
 register_shape_func("cast", False, elemwise_shape_func)
@@ -276,6 +300,7 @@ register_shape_func("log", False, elemwise_shape_func)
 register_shape_func("device_copy", False, elemwise_shape_func)
 register_shape_func("clip", False, elemwise_shape_func)
 register_shape_func("log2", False, elemwise_shape_func)
+register_shape_func("log10", False, elemwise_shape_func)
 register_shape_func("sigmoid", False, elemwise_shape_func)
 register_shape_func("tanh", False, elemwise_shape_func)
 register_shape_func("logical_not", False, elemwise_shape_func)

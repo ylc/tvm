@@ -250,7 +250,6 @@ def decl_buffer(
     """
     # pylint: disable=import-outside-toplevel
     from .expr import Var
-
     shape = (shape,) if isinstance(shape, (PrimExpr, Integral)) else shape
     dtype = "float32" if dtype is None else dtype
     strides = () if strides is None else strides
@@ -262,6 +261,8 @@ def decl_buffer(
         storage_type = PrimType(dtype)
         storage_type = PrimType("int8") if storage_type.dtype == "bool" else storage_type
         data = Var(name, PointerType(storage_type, scope), span)
+    # import pdb;pdb.set_trace()
+
     return _ffi_api.Buffer(  # type: ignore
         data,
         dtype,

@@ -131,6 +131,21 @@ def compute_reshape(attrs, inputs, output_type):
 
 _reg.register_strategy("sparse_reshape", strategy.sparse_reshape_strategy)
 
+# stft
+@_reg.register_compute("stft")
+def compute_stft(attrs, inputs, output_type):
+    """Compute definition of stft"""
+    return topi.stft(
+        inputs[0],
+        inputs[1],
+        inputs[2],
+        inputs[3],
+        inputs[4],
+        output_type.shape,
+    )
+
+_reg.register_strategy("stft", strategy.stft_strategy)
+
 # scatter_add
 @_reg.register_compute("scatter_add")
 def compute_scatter_add(attrs, inputs, output_type):
@@ -657,6 +672,26 @@ def sparse_reshape_shape_func(attrs, inputs, _):
     """
     return _sparse_reshape_shape_func(inputs[0], inputs[1], inputs[2])
 
+
+@script
+def _stft_shape_func(data, n_fft, hop_length):
+    output_shape = output_tensor((4,), "int64")
+    output_shape[0] = int64(data.shape[0])
+    output_shape[1] = int64(int64(n_fft[0]) // int64(2)) + int64(1) 
+    output_shape[2] = int64(int64(data.shape[1] - n_fft[0]) // int64(hop_length[0])) + int64(1)
+    # output_shape[1] = int64(1025)
+    # output_shape[2] = int64(87)
+    output_shape[3] = int64(2) 
+    return output_shape
+
+
+@_reg.register_shape_func("stft", True)
+def stft_shape_func(attrs, inputs, _):
+    """
+    Shape func for stft.
+    """
+    # import pdb;pdb.set_trace()
+    return [_stft_shape_func(inputs[0], inputs[1], inputs[2])]
 
 @script
 def _layout_transform_shape_func(

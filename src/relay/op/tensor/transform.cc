@@ -1710,6 +1710,62 @@ RELAY_REGISTER_OP("sparse_reshape")
     .set_attr<TOpPattern>("TOpPattern", kInjective)
     .set_support_level(3);
 
+
+
+
+bool STFTRel(const Array<Type>& types, int num_inputs, const Attrs& attrs,
+                      const TypeReporter& reporter) {
+  // types: [ ,result]
+  ICHECK_EQ(types.size(), 6) << "STFTRel expects 6 inputs but " << types.size()
+                             << "provided";
+  std::vector<Type> fields;
+  auto data = types[0].as<TensorTypeNode>();
+  auto batch_size = data->shape[0];
+  // reporter->Assign(types[types.size() - 1], TensorType(Array<PrimExpr>{batch_size, Any(), Any(), 2}, tvm::DataType::Float(32)));
+  // reporter->Assign(types[types.size() - 1], TensorType(Array<PrimExpr>{batch_size, Any(), Any(), 2}, tvm::DataType::Float(32)));
+
+  // reporter->Assign(types[types.size() - 1], TensorType(Array<PrimExpr>{batch_size, 1025, indexdiv(data->shape[1] - 2048,512) + 1, 2}, tvm::DataType::Float(32)));
+  // std::cout << "Data Shape 1" << data->shape[1];
+  // std::cout << "Data Shape 0" << data->shape[0];
+  // reporter->Assign(types[types.size() - 1], TensorType(Array<PrimExpr>{batch_size, 1025, 87, Any()}, tvm::DataType::Float(32)));
+
+  // reporter->Assign(types[types.size() - 1], TensorType(Array<PrimExpr>{batch_size, Any(), Any(), 2}, tvm::DataType::Float(32)));
+
+  reporter->Assign(types[types.size() - 1], TensorType(Array<PrimExpr>{batch_size, 1025,87, 2}, tvm::DataType::Float(32)));
+
+  return true;
+}
+
+Expr MakeSTFT(Expr data, Expr n_fft, Expr hop_length, Expr win_length, Expr window) {
+  static const Op& op = Op::Get("stft");
+  return Call(op, {data, n_fft, hop_length, win_length, window}, Attrs(), {});
+}
+
+TVM_REGISTER_GLOBAL("relay.op._make.stft").set_body_typed(MakeSTFT);
+
+RELAY_REGISTER_OP("stft")
+    .describe(R"code(Return new sparse indices of the reshaped tensor
+)code" TVM_ADD_FILELINE)
+    .set_num_inputs(5)
+    .add_argument("data", "Tensor",
+                  "A 2-D tensor of shape [N, ndims], which specifies the indices of the"
+                  "elements in the sparse tensor that contain nonzero values.  COO Format")
+    .add_argument("n_fft", "Tensor",
+                  "A 1-D tensor of shape [ndims], which specifies the previous dense shape of the"
+                  "sparse tensor")
+    .add_argument("hop_length", "Tensor",
+                  "A 1-D tensor of shape [ndims], which specifies the desired dense shape of the"
+                  "sparse tensor")
+    .add_argument("win_length", "Tensor",
+                  "A 1-D tensor of shape [ndims], which specifies the desired dense shape of the"
+                  "sparse tensor")
+    .add_argument("window", "Tensor",
+                  "A 1-D tensor of shape [ndims], which specifies the desired dense shape of the"
+                  "sparse tensor")
+    .add_type_rel("stft", STFTRel)
+    .set_attr<TOpPattern>("TOpPattern", kInjective)
+    .set_support_level(3);
+
 // meshgrid operator
 TVM_REGISTER_NODE_TYPE(MeshgridAttrs);
 

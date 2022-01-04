@@ -1761,6 +1761,173 @@ def verify_func(target, dev, func, data, ref_res):
         relay.backend.te_compiler.get().clear()
 
 
+
+class TestSTFT:
+    data_np, n_fft, hop_length, win_length, window_np, center, pad_mode, normalized, onesided = tvm.testing.parameters(
+        (
+            np.array([[1, 2, 3, 4, 5, 6]], dtype=np.float32),
+            3,
+            3,
+            3,
+            np.array([4, 3, 2], dtype=np.int64),
+            False,
+            'reflect',
+            False, 
+            True,
+        ),
+        (
+            np.array([[1, 2, 3, 4, 5, 6, 7, 8, 9], [2, 5, 7, 8, 5, 6, 7, 3, 2]], dtype=np.float32),
+            2,
+            1,
+            2,
+            np.array([1, 3], dtype=np.int32),
+            False,
+            'reflect',
+            False, 
+            True,
+        ),
+        (
+            100*np.random.randn(1, 50000).astype(np.float32),
+            20,
+            13,
+            20,
+            np.random.randint(100, size=20), 
+            False,
+            'reflect',
+            False, 
+            True,
+        ),
+        (
+            100*np.random.randn(1, 10).astype(np.float32),
+            2,
+            3,
+            2,
+            np.random.randint(100, size=2), 
+            False,
+            'reflect',
+            False, 
+            True,
+        ),
+    )
+
+    use_dyn = tvm.testing.parameter(True, False, ids=["dyn", "static"])
+
+    @tvm.testing.fixture(cache_return_value=True)
+    def ref_res(
+        self,
+        data_np: np.ndarray,
+        n_fft: int,
+        hop_length: int,
+        win_length: int, 
+        window_np, 
+        center, 
+        pad_mode, 
+        normalized, 
+        onesided
+    ):
+        """
+        This function calculates the expected output of segment_sum operator given the inputs.
+        """
+
+        def pad_window(window_np, n_fft):
+            shape = window_np.shape[-1]
+            lpad = int((n_fft - shape) // 2)
+            lengths = [(0, 0)] * len(window_np.shape)
+            lengths[-1] = (lpad, int(n_fft - shape - lpad))
+            if lpad < 0:
+                print("ERROR Padding")
+            return np.pad(window_np, lengths, mode='constant')
+
+
+        def pad_input(input_data, n_fft, pad_mode):
+            pad_mode_dict = {'reflect': 'reflect', 'constant':'constant','replicate':'symmetric','circular':'wrap'}
+            padding = [(0, 0) for _ in range(input_data.ndim)]
+            padding[-1] = (int(n_fft // 2), int(n_fft // 2))
+            return np.pad(input_data.numpy(), padding, mode=pad_mode_dict[pad_mode])
+
+        import math
+        if not onesided:
+            n_rows = n_fft 
+        else:
+            n_rows = n_fft//2 + 1 
+        if window_np is None:
+            window_np = np.ones(win_length, dtype=np.int64)
+        window_np = pad_window(window_np, n_fft)
+        if center:
+            data_np = pad_input(input_data=data_np, n_fft=n_fft, pad_mode=pad_mode)
+
+        n_cols = (data_np.shape[-1] - n_fft)//hop_length + 1
+        np_result = np.zeros((data_np.shape[0], n_rows,n_cols,2))
+
+        for batch in range(data_np.shape[0]):
+            for w in range(n_rows):
+                for m in range(n_cols): 
+                    for k in range(n_fft):
+                        np_result[batch][w][m][0] += (window_np[k] * data_np[batch][m*hop_length+k] * math.cos(2*math.pi*w*k/n_fft))
+                        np_result[batch][w][m][1] -= (window_np[k] * data_np[batch][m*hop_length+k] * math.sin(2*math.pi*w*k/n_fft))
+        return np_result
+
+
+    # @tvm.testing.known_failing_targets("llvm")
+    # @tvm.testing.exclude_targets("llvm")
+    def test_stft(
+        self,
+        target,
+        dev,
+        ref_res: np.ndarray,
+        data_np: np.ndarray,
+        n_fft: int,
+        hop_length: int,
+        win_length: int, 
+        window_np: np.ndarray,
+        center: bool,
+        pad_mode: str,
+        normalized: bool,
+        onesided: bool
+    ):
+
+        data = relay.var(
+            "data",
+            relay.TensorType(data_np.shape, str(data_np.dtype)),
+        )
+        window = relay.var(
+            "window",
+            relay.TensorType(window_np.shape, str(window_np.dtype)),
+        )
+    
+        z = relay.op.stft(data, n_fft, hop_length, win_length, window)
+
+        func = relay.Function([data, window], z)
+        stft_result = run_infer_type(z)
+        # assert stft_result.checked_type.dtype == data_np.dtype
+        verify_func(
+            target,
+            dev,
+            func,
+            [data_np, window_np],
+            ref_res,
+            rtol = 1e-3,
+            atol = 1e-3,
+        )
+
+def verify_func(target, dev, func, data, ref_res, rtol = 1e-5, atol = 1e-7):
+    assert isinstance(data, list)
+    for kind in ["vm"]:
+        mod = tvm.ir.IRModule.from_expr(func)
+        op_res = relay.create_executor(kind, mod=mod, device=dev, target=target).evaluate()(*data)
+        # continue
+        if isinstance(op_res, tvm.runtime.container.ADT):
+            assert len(op_res) == len(
+                ref_res
+            ), "Outputs from TVM and Python implementation must be equal "
+            for op_result, ref_result in zip(op_res, ref_res):
+                tvm.testing.assert_allclose(op_result.numpy(), ref_result, rtol=rtol, atol=atol)
+        else:
+            # print("Op Res", op_res, "Ref res", ref_res)
+            tvm.testing.assert_allclose(op_res.numpy(), ref_res, rtol=rtol, atol=atol)
+        relay.backend.te_compiler.get().clear()
+
+
 def test_adv_index(target, dev, executor_kind):
     def verify_adv_index(data_shape, index_shapes):
         dtype = "float32"

@@ -473,6 +473,7 @@ void CodeGenHybrid::ReserveKeywords() {
   GetUniqueName("float32");
   GetUniqueName("float64");
   GetUniqueName("ceil_div");
+  GetUniqueName("floor_div");
   GetUniqueName("max_num_threads");
 }
 

@@ -1332,6 +1332,35 @@ def wrap_compute_sparse_reshape(topi_compute):
     return _compute_sparse_reshape
 
 
+
+# stft
+@override_native_generic_func("stft_strategy")
+def stft_strategy(attrs, outs, out_type, target):
+    strategy = _op.OpStrategy()
+    strategy.add_implementation(
+        wrap_compute_stft(topi.stft),
+        wrap_topi_schedule(topi.generic.schedule_extern),
+        name="stft.generic",
+    )
+    return strategy
+
+
+def wrap_compute_stft(topi_compute):
+    """Wrap stft compute"""
+
+    def _compute_stft(attrs, inputs, output_type):
+        return [topi_compute(
+            inputs[0],
+            inputs[1],
+            inputs[2],
+            inputs[3],
+            inputs[4],
+            output_type.shape,
+        )]
+
+    return _compute_stft
+
+
 # roi_pool
 @generic_func
 def schedule_roi_pool(attrs, outs, target):

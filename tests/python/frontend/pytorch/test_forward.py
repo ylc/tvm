@@ -407,7 +407,6 @@ def test_forward_multiply():
     verify_model(Multiply3().float().eval(), input_data=input_data)
     verify_model(Multiply4().float().eval(), input_data=input_data)
 
-
 @tvm.testing.uses_gpu
 def test_min_max():
     class Max(Module):
@@ -436,7 +435,17 @@ def test_min_max():
         def forward(self, lhs, rhs):
             return torch.min(lhs, rhs)
 
-    input_data = [torch.rand((10, 10)), torch.rand((10, 10))]
+    class Max4(Module):
+        def forward(self, inp): 
+            out = torch.amax(inp, (1, 2), keepdim=True)
+            return out
+
+    class Min4(Module):
+        def forward(self, inp): 
+            out = torch.amin(inp, (0, 3), keepdim=False)
+            return out
+
+    input_data = [torch.rand((10, 10, 10, 10)), torch.rand((10, 10, 10, 10))]
 
     verify_model(Max(), input_data=input_data[0])
     verify_model(Min(), input_data=input_data[0])
@@ -444,6 +453,8 @@ def test_min_max():
     verify_model(Min2(), input_data=input_data[0])
     verify_model(Max3(), input_data=input_data)
     verify_model(Min3(), input_data=input_data)
+    verify_model(Max4(), input_data=input_data[0])
+    verify_model(Min4(), input_data=input_data[0])
 
 
 @tvm.testing.uses_gpu

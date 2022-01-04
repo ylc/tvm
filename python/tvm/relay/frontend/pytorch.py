@@ -24,6 +24,7 @@ import itertools
 import math
 import sys
 import logging
+from typing import Union, Tuple
 
 import numpy as np
 import tvm
@@ -264,7 +265,7 @@ class PyTorchOpConverter:
         if len(inputs) == 1:
             data = self.pytorch_promote_types(inputs[:1], input_types[:1])
             return get_relay_op(name_reduce)(data[0])
-        elif len(inputs) >= 2 and isinstance(inputs[1], int):
+        elif len(inputs) >= 2 and isinstance(inputs[1], (list, int)):
             data = self.pytorch_promote_types(inputs[:1], input_types[:1])
             dim = inputs[1]
             keepdims = inputs[2] if len(inputs) > 2 else False
@@ -1328,7 +1329,6 @@ class PyTorchOpConverter:
     def reshape(self, inputs, input_types):
         data = inputs[0]
         new_shape = inputs[1]
-
         tmp_shape = []
         is_dyn = False
         for s in new_shape:
@@ -1651,7 +1651,13 @@ class PyTorchOpConverter:
                 return _op.reshape(output, [*a_shape[:-2], a_shape[-2], b_shape[-1]])
             return output
         elif len(a_shape) > 2:
-            inputs_0 = _op.reshape(inputs_0, [-1, a_shape[-1]])
+            # import pdb;pdb.set_trace()
+            x = _op.shape_of(inputs[0], dtype="int32")
+            y = _op.take(x, _expr.const([2]),axis=0)
+            z = _op.concatenate([_expr.const([-1]),y], axis=0)
+            inputs_0 = _op.reshape(inputs_0, z)
+
+            # inputs_0 = _op.reshape(inputs_0, [-1, a_shape[-1]])
 
         if len(b_shape) > 2:
             trans_axes = list(range(len(b_shape)))
@@ -1669,7 +1675,13 @@ class PyTorchOpConverter:
 
         # Reshape output into a N dimensional tensor when a or b dim > 2
         if len(a_shape) > 2:
-            out = _op.reshape(out, [*a_shape[:-1], b_shape[-1]])
+            # import pdb;pdb.set_trace()
+            x = _op.shape_of(inputs[0], dtype="int32")
+            y = _op.take(x, _expr.const([0, 1]),axis=0)
+            xx = _op.shape_of(inputs[1], dtype="int32")
+            yy = _op.take(xx, _expr.const([1]),axis=0)
+            z = _op.concatenate([y,yy], axis=0)
+            out = _op.reshape(out, z)
         elif len(b_shape) > 2:
             out = _op.reshape(out, [a_shape[-2], -1, b_shape[-1]])
             out = _op.reshape(
@@ -2115,6 +2127,20 @@ class PyTorchOpConverter:
         )
 
         return _op.nn.bias_add(conv_out, bias)
+
+    def stft(self, inputs, input_types): 
+        data = inputs[0] 
+        n_fft = inputs[1]
+        hop_length = inputs[2]
+        win_length = inputs[3]
+        window=inputs[4]
+        center=inputs[5]
+        # pad_mode=inputs[6]
+        normalized=inputs[6]
+        onesided=inputs[7]
+        # import pdb; pdb.set_trace()
+        # return _op.stft(data, n_fft, hop_length, win_length, window, center, pad_mode, normalized, onesided)
+        return _op.stft(data, n_fft, hop_length, win_length, window)
 
     def unbind(self, inputs, input_types):
         data = inputs[0]
@@ -2860,6 +2886,10 @@ class PyTorchOpConverter:
             "aten::device": self.none,
             "prim::device": self.none,
             "aten::sub": self.make_elemwise("subtract"),
+            "aten::sub_": self.make_elemwise("subtract"),
+            "aten::amax": self.max,
+            "aten::amin": self.min,
+            "aten::stft": self.stft,
             "aten::max": self.max,
             "aten::min": self.min,
             "aten::mul": self.make_elemwise("multiply"),
