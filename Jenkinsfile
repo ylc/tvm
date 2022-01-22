@@ -477,7 +477,7 @@ stage('Unit Test') {
           }
         }
       }
-    } else {
+    else {
       Utils.markStageSkippedForConditional('topi: GPU')
     }
   },
