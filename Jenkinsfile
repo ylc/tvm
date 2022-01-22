@@ -431,7 +431,7 @@ stage('Unit Test') {
             }
           }
         }
-     } else {
+      } else {
         Utils.markStageSkippedForConditional('python3: i386')
       }
     },
@@ -457,28 +457,30 @@ stage('Unit Test') {
     //      Utils.markStageSkippedForConditional('python3: arm')
     //   }
     // },
+  }
 }
 
 stage('Integration Test') {
   parallel 'topi: GPU': {
-  if (is_docs_only_build != 1) {
-    node('GPU') {
-      ws(per_exec_ws('tvm/topi-python-gpu')) {
-        init_git()
-        unpack_lib('gpu', tvm_multilib)
-        timeout(time: max_time, unit: 'MINUTES') {
-          ci_setup(ci_gpu)
-          sh (
-            script: "${docker_run} ${ci_gpu} ./tests/scripts/task_python_topi.sh",
-            label: "Run TOPI tests",
-          )
-          junit "build/pytest-results/*.xml"
+      if (is_docs_only_build != 1) {
+        node('GPU') {
+          ws(per_exec_ws('tvm/topi-python-gpu')) {
+            init_git()
+            unpack_lib('gpu', tvm_multilib)
+            timeout(time: max_time, unit: 'MINUTES') {
+              ci_setup(ci_gpu)
+              sh (
+                script: "${docker_run} ${ci_gpu} ./tests/scripts/task_python_topi.sh",
+                label: "Run TOPI tests",
+              )
+              junit "build/pytest-results/*.xml"
+            }
+          }
         }
       }
-    }
     } else {
       Utils.markStageSkippedForConditional('topi: GPU')
-  }
+    }
   },
   'frontend: GPU': {
     if (is_docs_only_build != 1) {
