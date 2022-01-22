@@ -458,10 +458,9 @@ stage('Unit Test') {
     //   }
     // },
   }
-}
 
-stage('Integration Test') {
-  parallel 'topi: GPU': {
+  stage('Integration Test') {
+    parallel 'topi: GPU': {
       if (is_docs_only_build != 1) {
         node('GPU') {
           ws(per_exec_ws('tvm/topi-python-gpu')) {
