@@ -434,7 +434,7 @@ stage('Unit Test') {
       } else {
         Utils.markStageSkippedForConditional('python3: i386')
       }
-    },
+    }
     // 'python3: arm': {
     //   if (is_docs_only_build != 1) {
     //     node('ARM') {
