@@ -3949,7 +3949,9 @@ def _test_ssd_impl():
                     tvm.testing.assert_allclose(tvm_output[i], tf_output[i], rtol=1e-3, atol=1e-3)
 
 
-@pytest.mark.skip("neo-ai/tvm: skip because stack limit of 100mb is exceeded by WellFormedChecker")
+@pytest.mark.skip(
+    reason="Use of threading module here hides errors, see https://github.com/apache/tvm/pull/10231"
+)
 def test_forward_ssd():
     run_thread = threading.Thread(target=_test_ssd_impl, args=())
     old_stack_size = threading.stack_size(100 * 1024 * 1024)
