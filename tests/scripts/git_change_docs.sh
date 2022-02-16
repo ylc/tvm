@@ -24,6 +24,8 @@ DOCS_DIR=0
 OTHER_DIR=0
 DOC_DIR="docs/"
 
+`git remote -v show`
+
 changed_files=`git diff --no-commit-id --name-only -r origin/main`
 
 for file in $changed_files; do
