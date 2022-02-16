@@ -162,11 +162,11 @@ stage('Sanity Check') {
     node('CPU') {
       ws(per_exec_ws('tvm/sanity')) {
         init_git()
-        is_docs_only_build = sh (
-          returnStatus: true,
-          script: './tests/scripts/git_change_docs.sh',
-          label: 'Check for docs only changes',
-        )
+        // is_docs_only_build = sh (
+        //   returnStatus: true,
+        //   script: './tests/scripts/git_change_docs.sh',
+        //   label: 'Check for docs only changes',
+        // )
         skip_ci = should_skip_ci(env.CHANGE_ID)
         sh (
           script: "${docker_run} ${ci_lint}  ./tests/scripts/task_lint.sh",
