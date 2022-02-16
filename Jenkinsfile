@@ -511,9 +511,10 @@ stage('Test') {
           junit 'build/pytest-results/*.xml'
         }
       }
+    }
     } else {
       Utils.markStageSkippedForConditional('topi: GPU')
-    }
+  }
   },
   'frontend: GPU': {
     if (!skip_ci && is_docs_only_build != 1) {
